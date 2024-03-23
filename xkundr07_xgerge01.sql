@@ -19,8 +19,8 @@ END;
 --Entity
 CREATE TABLE Klient (
     r_cislo CHAR(11) NOT NULL,
-    jmeno VARCHAR(255) NOT NULL,
-    prijmeni VARCHAR(255) NOT NULL,
+    jmeno VARCHAR(255),
+    prijmeni VARCHAR(255),
     adresa VARCHAR(255),
     telefon VARCHAR(255),
     email VARCHAR(255)
@@ -31,15 +31,14 @@ CREATE TABLE Ucet (
     c_uctu NUMBER(10),
     r_cislo CHAR(11) NOT NULL,
     stav DECIMAL(10,2) DEFAULT 0,
-    c_banky INTEGER,
-    predcisli INTEGER DEFAULT 0,
-    iban VARCHAR(255)
+    c_banky NUMBER(4),
+    predcisli NUMBER(6) DEFAULT 0
 );
 
 --Klient_Ucet many to many relationship
 CREATE TABLE Disponent (
     r_cislo CHAR(11) NOT NULL,
-    c_uctu INTEGER NOT NULL
+    c_uctu NUMBER(10) NOT NULL
 );
 
 --Entity
@@ -47,8 +46,9 @@ CREATE TABLE Operace (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT NULL,
-    castka DECIMAL(10,2) NOT NULL
+    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    castka DECIMAL(10,2) NOT NULL,
+    provedl VARCHAR(255)
 );
 
 --Subtype of Operace
@@ -56,9 +56,9 @@ CREATE TABLE Vklad (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT NULL,
+    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
     castka DECIMAL(10,2) NOT NULL,
-    misto_vkladu VARCHAR(255)
+    provedl VARCHAR(255) DEFAULT 'System'
 );
 
 --Subtype of Operace
@@ -66,9 +66,9 @@ CREATE TABLE Vyber (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT NULL,
+    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
     castka DECIMAL(10,2) NOT NULL,
-    misto_vyberu VARCHAR(255)
+    provedl VARCHAR(255) DEFAULT 'System'
 );
 
 --Subtype of Operace
@@ -76,10 +76,11 @@ CREATE TABLE Prevod (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT NULL,
+    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
     castka DECIMAL(10,2) NOT NULL,
-    proti_predcisli INTEGER,
-    proti_c_uctu NUMBER(10)
+    provedl VARCHAR(255) DEFAULT 'System',
+    proti_predcisli NUMBER(6) DEFAULT 0,
+    proti_c_uctu NUMBER(10) NOT NULL
 );
 
 --Subtype of Prevod
@@ -87,10 +88,11 @@ CREATE TABLE V_bance (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT NULL,
+    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
     castka DECIMAL(10,2) NOT NULL,
-    proti_predcisli INTEGER,
-    proti_c_uctu NUMBER(10)
+    provedl VARCHAR(255) DEFAULT 'System',
+    proti_predcisli NUMBER(6) DEFAULT 0,
+    proti_c_uctu NUMBER(10) NOT NULL
 );
 
 --Subtype of Prevod
@@ -98,17 +100,25 @@ CREATE TABLE Mimo_banku (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT NULL,
+    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
     castka DECIMAL(10,2) NOT NULL,
-    proti_predcisli INTEGER,
-    proti_c_uctu NUMBER(10),
-    proti_c_banky INTEGER,
-    proti_iban VARCHAR(255)
+    provedl VARCHAR(255) DEFAULT 'System',
+    proti_predcisli NUMBER(6) DEFAULT 0,
+    proti_c_uctu NUMBER(10) NOT NULL,
+    proti_c_banky NUMBER(4) NOT NULL
 );
 
 -- Validate account number
-ALTER TABLE Ucet ADD CHECK (c_uctu > 0 AND MOD((MOD(c_uctu,10)*1 + MOD(FLOOR(c_uctu/10),10)*2+ MOD(FLOOR(c_uctu/100),10)*4+ MOD(FLOOR(c_uctu/1000),10)*8+ MOD(FLOOR(c_uctu/10000),10)*5 + MOD(FLOOR(c_uctu/100000),10)*10+
-            MOD(FLOOR(c_uctu/1000000),10)*9 + MOD(FLOOR(c_uctu/10000000),10)*7+ MOD(FLOOR(c_uctu/100000000),10)*3+ MOD(FLOOR(c_uctu/1000000000),10)*6),11) = 0);
+ALTER TABLE Ucet ADD CHECK (c_uctu > 0 AND MOD((MOD(c_uctu,10)*1 + MOD(FLOOR(c_uctu/10),10)*2 + MOD(FLOOR(c_uctu/100),10)*4 +
+    MOD(FLOOR(c_uctu/1000),10)*8 + MOD(FLOOR(c_uctu/10000),10)*5 + MOD(FLOOR(c_uctu/100000),10)*10 + MOD(FLOOR(c_uctu/1000000),10)*9 +
+    MOD(FLOOR(c_uctu/10000000),10)*7 + MOD(FLOOR(c_uctu/100000000),10)*3 + MOD(FLOOR(c_uctu/1000000000),10)*6),11) = 0);
+ALTER TABLE Ucet ADD CHECK (MOD((MOD(predcisli,10)*1 + MOD(FLOOR(predcisli/10),10)*2 + MOD(FLOOR(predcisli/100),10)*4 +
+    MOD(FLOOR(predcisli/1000),10)*8 + MOD(FLOOR(predcisli/10000),10)*5 + MOD(FLOOR(predcisli/100000),10)*10),11) = 0);
+ALTER TABLE Prevod ADD CHECK ((proti_c_uctu > 0 AND MOD((MOD(proti_c_uctu,10)*1 + MOD(FLOOR(proti_c_uctu/10),10)*2 + MOD(FLOOR(proti_c_uctu/100),10)*4 +
+    MOD(FLOOR(proti_c_uctu/1000),10)*8 + MOD(FLOOR(proti_c_uctu/10000),10)*5 + MOD(FLOOR(proti_c_uctu/100000),10)*10 + MOD(FLOOR(proti_c_uctu/1000000),10)*9 +
+    MOD(FLOOR(proti_c_uctu/10000000),10)*7 + MOD(FLOOR(proti_c_uctu/100000000),10)*3 + MOD(FLOOR(proti_c_uctu/1000000000),10)*6),11) = 0));
+ALTER TABLE Prevod ADD CHECK (MOD((MOD(proti_predcisli,10)*1 + MOD(FLOOR(proti_predcisli/10),10)*2 + MOD(FLOOR(proti_predcisli/100),10)*4 +
+    MOD(FLOOR(proti_predcisli/1000),10)*8 + MOD(FLOOR(proti_predcisli/10000),10)*5 + MOD(FLOOR(proti_predcisli/100000),10)*10),11) = 0);
 
 -- Add constraints
 ALTER TABLE Klient ADD CONSTRAINT PK_klient PRIMARY KEY (r_cislo);
@@ -145,14 +155,29 @@ ALTER TABLE Mimo_banku ADD CONSTRAINT FK_mimo_banku_r_cislo FOREIGN KEY (r_cislo
 ------------------PROCEDURES-AND-FUNCTIONS------------------
 ------------------------------------------------------------
 
--- Check if account exists
-CREATE OR REPLACE PROCEDURE check_account_exists(c_uctu_in IN INTEGER) AS
-    v_count NUMBER;
+CREATE OR REPLACE FUNCTION generate_c_uctu RETURN NUMBER(10) AS
+    v_gen_c_uctu NUMBER(10);
 BEGIN
-    SELECT COUNT(*) INTO v_count FROM Ucet WHERE c_uctu = c_uctu_in;
-    IF v_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Bank account not exists.');
-    END IF;
+    LOOP
+        v_gen_c_uctu := FLOOR(DBMS_RANDOM.VALUE * 10000000000);
+
+        IF MOD((MOD(v_gen_c_uctu,10)*1 + MOD(FLOOR(v_gen_c_uctu/10),10)*2 + MOD(FLOOR(v_gen_c_uctu/100),10)*4 +
+            MOD(FLOOR(v_gen_c_uctu/1000),10)*8 + MOD(FLOOR(v_gen_c_uctu/10000),10)*5 + MOD(FLOOR(v_gen_c_uctu/100000),10)*10 + MOD(FLOOR(v_gen_c_uctu/1000000),10)*9 +
+            MOD(FLOOR(v_gen_c_uctu/10000000),10)*7 + MOD(FLOOR(v_gen_c_uctu/100000000),10)*3 + MOD(FLOOR(v_gen_c_uctu/1000000000),10)*6),11) = 0 THEN
+
+            IF NOT EXISTS (SELECT 1 FROM Ucet WHERE c_uctu = v_gen_c_uctu) THEN
+                RETURN v_gen_c_uctu;
+            END IF;
+        END IF;
+    END LOOP;
+END;
+
+    -- Get new index for operation
+CREATE OR REPLACE FUNCTION get_new_index(c_uctu_in IN INTEGER) RETURN INTEGER AS
+    max_index NUMBER;
+BEGIN
+    SELECT COALESCE(MAX(c_operace), 0) + 1 INTO max_index FROM Operace WHERE c_uctu = c_uctu_in;
+    RETURN max_index;
 END;
 
 CREATE OR REPLACE PROCEDURE check_accounts_are_in_same_bank(c_uctu_in IN INTEGER, proti_predcisli_in IN INTEGER, proti_c_uctu_in IN INTEGER) AS
@@ -164,77 +189,61 @@ BEGIN
     END IF;
 END;
 
--- Get new index for operation
-CREATE OR REPLACE FUNCTION get_new_index(c_uctu_in IN INTEGER) RETURN INTEGER AS
-    max_index NUMBER;
-BEGIN
-    SELECT COALESCE(MAX(c_operace), 0) + 1 INTO max_index FROM Operace WHERE c_uctu = c_uctu_in;
-    RETURN max_index;
-END;
-
--- Get timestamp for operation (if NULL then use current timestamp)
-CREATE OR REPLACE FUNCTION get_timestamp(datum_cas_in IN TIMESTAMP) RETURN TIMESTAMP AS
-BEGIN
-    IF datum_cas_in IS NULL THEN
-        RETURN SYSTIMESTAMP;
-    ELSE
-        RETURN datum_cas_in;
-    END IF;
-END;
-
 ------------------------------------------------------------
 --------------------------TRIGGERS--------------------------
 ------------------------------------------------------------
+
+--TODO fix generate_c_uctu
+--CREATE OR REPLACE TRIGGER trig_insert_ucet
+--BEFORE INSERT ON Ucet
+--FOR EACH ROW
+--BEGIN
+--    IF :NEW.c_uctu IS NULL THEN
+--       :NEW.c_uctu := generate_c_uctu();
+--    END IF;
+--END;
 
 CREATE OR REPLACE TRIGGER trig_insert_vklad
 BEFORE INSERT ON Vklad
 FOR EACH ROW
 BEGIN
-    check_account_exists(:NEW.c_uctu);
     :NEW.c_operace := get_new_index(:NEW.c_uctu);
-    :NEW.datum_cas := get_timestamp(:NEW.datum_cas);
 
     -- Copy values to super tables
-    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka);
+    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_vyber
 BEFORE INSERT ON Vyber
 FOR EACH ROW
 BEGIN
-    check_account_exists(:NEW.c_uctu);
     :NEW.c_operace := get_new_index(:NEW.c_uctu);
-    :NEW.datum_cas := get_timestamp(:NEW.datum_cas);
 
     -- Copy values to super tables
-    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka);
+    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_mimo_banku
 BEFORE INSERT ON Mimo_banku
 FOR EACH ROW
 BEGIN
-    check_account_exists(:NEW.c_uctu);
     :NEW.c_operace := get_new_index(:NEW.c_uctu);
-    :NEW.datum_cas := get_timestamp(:NEW.datum_cas);
 
     -- Copy values to super tables
-    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka);
-    INSERT INTO Prevod VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.proti_predcisli, :NEW.proti_c_uctu);
+    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
+    INSERT INTO Prevod VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl, :NEW.proti_predcisli, :NEW.proti_c_uctu);
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_v_bance
 BEFORE INSERT ON V_bance
 FOR EACH ROW
 BEGIN
-    check_account_exists(:NEW.c_uctu);
     check_accounts_are_in_same_bank(:NEW.c_uctu, :NEW.proti_predcisli, :NEW.proti_c_uctu);
     :NEW.c_operace := get_new_index(:NEW.c_uctu);
-    :NEW.datum_cas := get_timestamp(:NEW.datum_cas);
 
     -- Copy values to super tables
-    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka);
-    INSERT INTO Prevod VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.proti_predcisli, :NEW.proti_c_uctu);
+    INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
+    INSERT INTO Prevod VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl, :NEW.proti_predcisli, :NEW.proti_c_uctu);
 END;
 
 ------------------------------------------------------------
@@ -248,10 +257,10 @@ INSERT INTO Klient VALUES('510230/0482', 'Pavel', 'Tomek', 'Tomkova 34, Brno', '
 INSERT INTO Klient VALUES('580807/9638', 'Josef', 'Madr', 'Svatoplukova 15, Brno', '+420 881 989 234', 'josef.madr@gmail.com');
 INSERT INTO Klient VALUES('625622/6249', 'Jana', 'Mala', 'Brnenska 56, Vyskov', '+420 345 215 968', 'malajana@gmail.com');
 
-INSERT INTO Ucet VALUES(4320271, '440726/0672', 52000, 0800, 000000, 'CZ94 0800 0000 0000 0432 0271');
-INSERT INTO Ucet VALUES(2348537, '530610/4532', 10000, 0800, 000000, 'CZ14 0800 0000 0000 0234 8537');
-INSERT INTO Ucet VALUES(2075751, '625622/6249', 26350, 0300, 000000, 'CZ13 0300 0000 0000 0207 5751');
-INSERT INTO Ucet VALUES(1182643, '530610/4532', 10853, 0300, 000035, 'CZ81 0300 0000 3500 0118 2643');
+INSERT INTO Ucet VALUES(4320271, '440726/0672', 52000, 0800, 000000);
+INSERT INTO Ucet VALUES(2348537, '530610/4532', 10000, 0800, 000000);
+INSERT INTO Ucet VALUES(2075751, '625622/6249', 26350, 0300, 000000);
+INSERT INTO Ucet VALUES(1182643, '530610/4532', 10853, 0300, 000035);
 
 INSERT INTO Disponent VALUES('530610/4532', 4320271);
 INSERT INTO Disponent VALUES('510230/0482', 4320271);
@@ -261,22 +270,22 @@ INSERT INTO Disponent VALUES('625622/6249', 2348537);
 
 -- Insert operations (Vklad, Vyber, Prevod, V_bance, Mimo_banku)
 -- Operations should be only inserted to subtype tables and triggers will copy them to super tables
-INSERT INTO Vklad (c_uctu, r_cislo, datum_cas, castka, misto_vkladu)
-VALUES(4320271, '440726/0672', TO_TIMESTAMP('10-10-2016 14:10:10.123000','DD-MM-RRRR HH24:MI:SS.FF'), 30000, 'banka');
-INSERT INTO Vklad (c_uctu, r_cislo, datum_cas, castka, misto_vkladu)
-VALUES(2348537, '530610/4532', TO_TIMESTAMP('02-05-2015 20:00:22.123000','DD-MM-RRRR HH24:MI:SS.FF'), 10000, 'bankomat');
-INSERT INTO Vyber (c_uctu, r_cislo, datum_cas, castka, misto_vyberu)
-VALUES(2075751, '510230/0482', TO_TIMESTAMP('11-12-2016 08:56:30.123000','DD-MM-RRRR HH24:MI:SS.FF'), 2000, 'bankomat');
-INSERT INTO Vyber (c_uctu, r_cislo, datum_cas, castka, misto_vyberu)
-VALUES(4320271, '530610/4532', TO_TIMESTAMP('22-07-2017 13:33:15.123000','DD-MM-RRRR HH24:MI:SS.FF'), 8000, 'bankomat');
-INSERT INTO V_bance (c_uctu, r_cislo, datum_cas, castka, proti_predcisli, proti_c_uctu)
-VALUES(2075751, '625622/6249', TO_TIMESTAMP('01-01-2018 09:02:22.123000','DD-MM-RRRR HH24:MI:SS.FF'), 10000, 000035, 1182643);
-INSERT INTO V_bance (c_uctu, r_cislo, datum_cas, castka, proti_predcisli, proti_c_uctu)
-VALUES(2348537, '601001/2218', TO_TIMESTAMP('28-11-2020 15:55:41.123000','DD-MM-RRRR HH24:MI:SS.FF'), 6000, 000000, 4320271);
-INSERT INTO Mimo_banku (c_uctu, r_cislo, datum_cas, castka, proti_predcisli, proti_c_uctu, proti_c_banky, proti_iban)
-VALUES(4320271, '440726/0672', TO_TIMESTAMP('17-03-2017 12:30:53.123000','DD-MM-RRRR HH24:MI:SS.FF'), 5000, 000000, 2075751, 0300, 'CZ13 0300 0000 0000 0207 5751');
-INSERT INTO Mimo_banku (c_uctu, r_cislo, datum_cas, castka, proti_predcisli, proti_c_uctu, proti_c_banky, proti_iban)
-VALUES(2075751, '510230/0482', TO_TIMESTAMP('30-08-2021 16:36:34.123000','DD-MM-RRRR HH24:MI:SS.FF'), 1000, 000000, 2348537, 0800, 'CZ14 0800 0000 0000 0234 8537');
+INSERT INTO Vklad (c_uctu, r_cislo, datum_cas, castka, provedl)
+VALUES(4320271, '440726/0672', TO_TIMESTAMP('10-10-2016 14:10:10.123000','DD-MM-RRRR HH24:MI:SS.FF'), 30000, 'Daniel Starý');
+INSERT INTO Vklad (c_uctu, r_cislo, datum_cas, castka, provedl)
+VALUES(2348537, '530610/4532', TO_TIMESTAMP('02-05-2015 20:00:22.123000','DD-MM-RRRR HH24:MI:SS.FF'), 10000, 'Daniel Starý');
+INSERT INTO Vyber (c_uctu, r_cislo, datum_cas, castka, provedl)
+VALUES(2075751, '510230/0482', TO_TIMESTAMP('11-12-2016 08:56:30.123000','DD-MM-RRRR HH24:MI:SS.FF'), 2000, 'Petra Silná');
+INSERT INTO Vyber (c_uctu, r_cislo, datum_cas, castka, provedl)
+VALUES(4320271, '530610/4532', TO_TIMESTAMP('22-07-2017 13:33:15.123000','DD-MM-RRRR HH24:MI:SS.FF'), 8000, 'Daniel Starý');
+INSERT INTO V_bance (c_uctu, r_cislo, datum_cas, castka, provedl, proti_predcisli, proti_c_uctu)
+VALUES(2075751, '625622/6249', TO_TIMESTAMP('01-01-2018 09:02:22.123000','DD-MM-RRRR HH24:MI:SS.FF'), 10000, 'Petra Silná', 000035, 1182643);
+INSERT INTO V_bance (c_uctu, r_cislo, datum_cas, castka, provedl, proti_predcisli, proti_c_uctu)
+VALUES(2348537, '601001/2218', TO_TIMESTAMP('28-11-2020 15:55:41.123000','DD-MM-RRRR HH24:MI:SS.FF'), 6000, 'Daniel Starý', 000000, 4320271);
+INSERT INTO Mimo_banku (c_uctu, r_cislo, datum_cas, castka, provedl, proti_predcisli, proti_c_uctu, proti_c_banky)
+VALUES(4320271, '440726/0672', TO_TIMESTAMP('17-03-2017 12:30:53.123000','DD-MM-RRRR HH24:MI:SS.FF'), 5000, 'Daniel Starý', 000000, 2075751, 0300);
+INSERT INTO Mimo_banku (c_uctu, r_cislo, datum_cas, castka, provedl, proti_predcisli, proti_c_uctu, proti_c_banky)
+VALUES(2075751, '510230/0482', TO_TIMESTAMP('30-08-2021 16:36:34.123000','DD-MM-RRRR HH24:MI:SS.FF'), 1000, 'Petra Silná', 000000, 2348537, 0800);
 
 COMMIT;
 
@@ -290,6 +299,3 @@ SELECT * FROM Vyber;
 SELECT * FROM Prevod;
 SELECT * FROM V_bance;
 SELECT * FROM Mimo_banku;
-
---TODO CHECK r_cislo
---TODO generate NULL values
