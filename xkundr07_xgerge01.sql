@@ -28,7 +28,7 @@ CREATE TABLE Klient (
 
 --Entity
 CREATE TABLE Ucet (
-    c_uctu INTEGER,
+    c_uctu NUMBER(10),
     r_cislo CHAR(11) NOT NULL,
     stav DECIMAL(10,2) DEFAULT 0,
     c_banky INTEGER,
@@ -45,7 +45,7 @@ CREATE TABLE Disponent (
 --Entity
 CREATE TABLE Operace (
     c_operace INTEGER,
-    c_uctu INTEGER NOT NULL,
+    c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
     datum_cas TIMESTAMP DEFAULT NULL,
     castka DECIMAL(10,2) NOT NULL
@@ -54,7 +54,7 @@ CREATE TABLE Operace (
 --Subtype of Operace
 CREATE TABLE Vklad (
     c_operace INTEGER,
-    c_uctu INTEGER NOT NULL,
+    c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
     datum_cas TIMESTAMP DEFAULT NULL,
     castka DECIMAL(10,2) NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE Vklad (
 --Subtype of Operace
 CREATE TABLE Vyber (
     c_operace INTEGER,
-    c_uctu INTEGER NOT NULL,
+    c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
     datum_cas TIMESTAMP DEFAULT NULL,
     castka DECIMAL(10,2) NOT NULL,
@@ -74,38 +74,43 @@ CREATE TABLE Vyber (
 --Subtype of Operace
 CREATE TABLE Prevod (
     c_operace INTEGER,
-    c_uctu INTEGER NOT NULL,
+    c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
     datum_cas TIMESTAMP DEFAULT NULL,
     castka DECIMAL(10,2) NOT NULL,
     proti_predcisli INTEGER,
-    proti_c_uctu INTEGER
+    proti_c_uctu NUMBER(10)
 );
 
 --Subtype of Prevod
 CREATE TABLE V_bance (
     c_operace INTEGER,
-    c_uctu INTEGER NOT NULL,
+    c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
     datum_cas TIMESTAMP DEFAULT NULL,
     castka DECIMAL(10,2) NOT NULL,
     proti_predcisli INTEGER,
-    proti_c_uctu INTEGER
+    proti_c_uctu NUMBER(10)
 );
 
 --Subtype of Prevod
 CREATE TABLE Mimo_banku (
     c_operace INTEGER,
-    c_uctu INTEGER NOT NULL,
+    c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
     datum_cas TIMESTAMP DEFAULT NULL,
     castka DECIMAL(10,2) NOT NULL,
     proti_predcisli INTEGER,
-    proti_c_uctu INTEGER,
+    proti_c_uctu NUMBER(10),
     proti_c_banky INTEGER,
     proti_iban VARCHAR(255)
 );
 
+-- Validate account number
+ALTER TABLE Ucet ADD CHECK (c_uctu > 0 AND MOD((MOD(c_uctu,10)*1 + MOD(FLOOR(c_uctu/10),10)*2+ MOD(FLOOR(c_uctu/100),10)*4+ MOD(FLOOR(c_uctu/1000),10)*8+ MOD(FLOOR(c_uctu/10000),10)*5 + MOD(FLOOR(c_uctu/100000),10)*10+
+            MOD(FLOOR(c_uctu/1000000),10)*9 + MOD(FLOOR(c_uctu/10000000),10)*7+ MOD(FLOOR(c_uctu/100000000),10)*3+ MOD(FLOOR(c_uctu/1000000000),10)*6),11) = 0);
+
+-- Add constraints
 ALTER TABLE Klient ADD CONSTRAINT PK_klient PRIMARY KEY (r_cislo);
 ALTER TABLE Ucet ADD CONSTRAINT PK_ucet PRIMARY KEY (c_uctu);
 ALTER TABLE Ucet ADD CONSTRAINT FK_ucet_r_cislo FOREIGN KEY (r_cislo) REFERENCES Klient(r_cislo) ON DELETE CASCADE;
@@ -286,5 +291,5 @@ SELECT * FROM Prevod;
 SELECT * FROM V_bance;
 SELECT * FROM Mimo_banku;
 
---TODO CHECK c_uctu, r_cislo
+--TODO CHECK r_cislo
 --TODO generate NULL values
