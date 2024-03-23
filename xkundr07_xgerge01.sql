@@ -114,9 +114,9 @@ ALTER TABLE Ucet ADD CHECK (c_uctu > 0 AND MOD((MOD(c_uctu,10)*1 + MOD(FLOOR(c_u
     MOD(FLOOR(c_uctu/10000000),10)*7 + MOD(FLOOR(c_uctu/100000000),10)*3 + MOD(FLOOR(c_uctu/1000000000),10)*6),11) = 0);
 ALTER TABLE Ucet ADD CHECK (MOD((MOD(predcisli,10)*1 + MOD(FLOOR(predcisli/10),10)*2 + MOD(FLOOR(predcisli/100),10)*4 +
     MOD(FLOOR(predcisli/1000),10)*8 + MOD(FLOOR(predcisli/10000),10)*5 + MOD(FLOOR(predcisli/100000),10)*10),11) = 0);
-ALTER TABLE Prevod ADD CHECK ((proti_c_uctu > 0 AND MOD((MOD(proti_c_uctu,10)*1 + MOD(FLOOR(proti_c_uctu/10),10)*2 + MOD(FLOOR(proti_c_uctu/100),10)*4 +
+ALTER TABLE Prevod ADD CHECK (proti_c_uctu > 0 AND MOD((MOD(proti_c_uctu,10)*1 + MOD(FLOOR(proti_c_uctu/10),10)*2 + MOD(FLOOR(proti_c_uctu/100),10)*4 +
     MOD(FLOOR(proti_c_uctu/1000),10)*8 + MOD(FLOOR(proti_c_uctu/10000),10)*5 + MOD(FLOOR(proti_c_uctu/100000),10)*10 + MOD(FLOOR(proti_c_uctu/1000000),10)*9 +
-    MOD(FLOOR(proti_c_uctu/10000000),10)*7 + MOD(FLOOR(proti_c_uctu/100000000),10)*3 + MOD(FLOOR(proti_c_uctu/1000000000),10)*6),11) = 0));
+    MOD(FLOOR(proti_c_uctu/10000000),10)*7 + MOD(FLOOR(proti_c_uctu/100000000),10)*3 + MOD(FLOOR(proti_c_uctu/1000000000),10)*6),11) = 0);
 ALTER TABLE Prevod ADD CHECK (MOD((MOD(proti_predcisli,10)*1 + MOD(FLOOR(proti_predcisli/10),10)*2 + MOD(FLOOR(proti_predcisli/100),10)*4 +
     MOD(FLOOR(proti_predcisli/1000),10)*8 + MOD(FLOOR(proti_predcisli/10000),10)*5 + MOD(FLOOR(proti_predcisli/100000),10)*10),11) = 0);
 
@@ -155,29 +155,22 @@ ALTER TABLE Mimo_banku ADD CONSTRAINT FK_mimo_banku_r_cislo FOREIGN KEY (r_cislo
 ------------------PROCEDURES-AND-FUNCTIONS------------------
 ------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION generate_c_uctu RETURN NUMBER(10) AS
-    v_gen_c_uctu NUMBER(10);
+CREATE OR REPLACE PROCEDURE generate_account_number(c_uctu_out OUT NUMBER) AS
+    v_count NUMBER;
 BEGIN
     LOOP
-        v_gen_c_uctu := FLOOR(DBMS_RANDOM.VALUE * 10000000000);
+        c_uctu_out := FLOOR(DBMS_RANDOM.VALUE * 10000000000);
 
-        IF MOD((MOD(v_gen_c_uctu,10)*1 + MOD(FLOOR(v_gen_c_uctu/10),10)*2 + MOD(FLOOR(v_gen_c_uctu/100),10)*4 +
-            MOD(FLOOR(v_gen_c_uctu/1000),10)*8 + MOD(FLOOR(v_gen_c_uctu/10000),10)*5 + MOD(FLOOR(v_gen_c_uctu/100000),10)*10 + MOD(FLOOR(v_gen_c_uctu/1000000),10)*9 +
-            MOD(FLOOR(v_gen_c_uctu/10000000),10)*7 + MOD(FLOOR(v_gen_c_uctu/100000000),10)*3 + MOD(FLOOR(v_gen_c_uctu/1000000000),10)*6),11) = 0 THEN
+        IF MOD((MOD(c_uctu_out,10)*1 + MOD(FLOOR(c_uctu_out/10),10)*2 + MOD(FLOOR(c_uctu_out/100),10)*4 +
+            MOD(FLOOR(c_uctu_out/1000),10)*8 + MOD(FLOOR(c_uctu_out/10000),10)*5 + MOD(FLOOR(c_uctu_out/100000),10)*10 + MOD(FLOOR(c_uctu_out/1000000),10)*9 +
+            MOD(FLOOR(c_uctu_out/10000000),10)*7 + MOD(FLOOR(c_uctu_out/100000000),10)*3 + MOD(FLOOR(c_uctu_out/1000000000),10)*6),11) = 0 THEN
 
-            IF NOT EXISTS (SELECT 1 FROM Ucet WHERE c_uctu = v_gen_c_uctu) THEN
-                RETURN v_gen_c_uctu;
+            SELECT COUNT(*) INTO v_count FROM Ucet WHERE c_uctu = c_uctu_out;
+            IF v_count = 0 THEN
+                RETURN;
             END IF;
         END IF;
     END LOOP;
-END;
-
-    -- Get new index for operation
-CREATE OR REPLACE FUNCTION get_new_index(c_uctu_in IN INTEGER) RETURN INTEGER AS
-    max_index NUMBER;
-BEGIN
-    SELECT COALESCE(MAX(c_operace), 0) + 1 INTO max_index FROM Operace WHERE c_uctu = c_uctu_in;
-    RETURN max_index;
 END;
 
 CREATE OR REPLACE PROCEDURE check_accounts_are_in_same_bank(c_uctu_in IN INTEGER, proti_predcisli_in IN INTEGER, proti_c_uctu_in IN INTEGER) AS
@@ -189,25 +182,31 @@ BEGIN
     END IF;
 END;
 
+CREATE OR REPLACE FUNCTION get_index_of_next_operation(c_uctu_in IN INTEGER) RETURN INTEGER AS
+    max_index NUMBER;
+BEGIN
+    SELECT COALESCE(MAX(c_operace), 0) + 1 INTO max_index FROM Operace WHERE c_uctu = c_uctu_in;
+    RETURN max_index;
+END;
+
 ------------------------------------------------------------
 --------------------------TRIGGERS--------------------------
 ------------------------------------------------------------
 
---TODO fix generate_c_uctu
---CREATE OR REPLACE TRIGGER trig_insert_ucet
---BEFORE INSERT ON Ucet
---FOR EACH ROW
---BEGIN
---    IF :NEW.c_uctu IS NULL THEN
---       :NEW.c_uctu := generate_c_uctu();
---    END IF;
---END;
+CREATE OR REPLACE TRIGGER trig_insert_ucet
+BEFORE INSERT ON Ucet
+FOR EACH ROW
+BEGIN
+    IF :NEW.c_uctu IS NULL THEN
+       generate_account_number(:NEW.c_uctu);
+    END IF;
+END;
 
 CREATE OR REPLACE TRIGGER trig_insert_vklad
 BEFORE INSERT ON Vklad
 FOR EACH ROW
 BEGIN
-    :NEW.c_operace := get_new_index(:NEW.c_uctu);
+    :NEW.c_operace := get_index_of_next_operation(:NEW.c_uctu);
 
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
@@ -217,7 +216,7 @@ CREATE OR REPLACE TRIGGER trig_insert_vyber
 BEFORE INSERT ON Vyber
 FOR EACH ROW
 BEGIN
-    :NEW.c_operace := get_new_index(:NEW.c_uctu);
+    :NEW.c_operace := get_index_of_next_operation(:NEW.c_uctu);
 
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
@@ -227,7 +226,7 @@ CREATE OR REPLACE TRIGGER trig_insert_mimo_banku
 BEFORE INSERT ON Mimo_banku
 FOR EACH ROW
 BEGIN
-    :NEW.c_operace := get_new_index(:NEW.c_uctu);
+    :NEW.c_operace := get_index_of_next_operation(:NEW.c_uctu);
 
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
@@ -239,7 +238,7 @@ BEFORE INSERT ON V_bance
 FOR EACH ROW
 BEGIN
     check_accounts_are_in_same_bank(:NEW.c_uctu, :NEW.proti_predcisli, :NEW.proti_c_uctu);
-    :NEW.c_operace := get_new_index(:NEW.c_uctu);
+    :NEW.c_operace := get_index_of_next_operation(:NEW.c_uctu);
 
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
