@@ -182,6 +182,17 @@ BEGIN
     END IF;
 END;
 
+CREATE OR REPLACE PROCEDURE check_client_has_access_to_account(r_cislo_in IN CHAR, c_uctu_in IN INTEGER) AS
+    v_count_1 NUMBER;
+    v_count_2 NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count_2 FROM Ucet WHERE Ucet.r_cislo = r_cislo_in AND Ucet.c_uctu = c_uctu_in;
+    SELECT COUNT(*) INTO v_count_1 FROM Disponent WHERE Disponent.r_cislo = r_cislo_in AND Disponent.c_uctu = c_uctu_in;
+    IF v_count_1 = 0 AND v_count_2 = 0 THEN
+        RAISE_APPLICATION_ERROR(-20000, 'Klient does not have access to account.');
+    END IF;
+END;
+
 CREATE OR REPLACE FUNCTION get_index_of_next_operation(c_uctu_in IN INTEGER) RETURN INTEGER AS
     max_index NUMBER;
 BEGIN
@@ -200,6 +211,13 @@ BEGIN
     IF :NEW.c_uctu IS NULL THEN
        generate_account_number(:NEW.c_uctu);
     END IF;
+END;
+
+CREATE OR REPLACE TRIGGER trig_insert_operace
+BEFORE INSERT ON Operace
+FOR EACH ROW
+BEGIN
+    check_client_has_access_to_account(:NEW.r_cislo, :NEW.c_uctu);
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_vklad
