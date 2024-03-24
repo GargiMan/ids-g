@@ -186,8 +186,8 @@ CREATE OR REPLACE PROCEDURE check_client_has_access_to_account(r_cislo_in IN CHA
     v_count_1 NUMBER;
     v_count_2 NUMBER;
 BEGIN
-    SELECT COUNT(*) INTO v_count_2 FROM Ucet WHERE Ucet.r_cislo = r_cislo_in AND Ucet.c_uctu = c_uctu_in;
-    SELECT COUNT(*) INTO v_count_1 FROM Disponent WHERE Disponent.r_cislo = r_cislo_in AND Disponent.c_uctu = c_uctu_in;
+    SELECT COUNT(*) INTO v_count_1 FROM Ucet WHERE Ucet.r_cislo = r_cislo_in AND Ucet.c_uctu = c_uctu_in;
+    SELECT COUNT(*) INTO v_count_2 FROM Disponent WHERE Disponent.r_cislo = r_cislo_in AND Disponent.c_uctu = c_uctu_in;
     IF v_count_1 = 0 AND v_count_2 = 0 THEN
         RAISE_APPLICATION_ERROR(-20000, 'Klient does not have access to account.');
     END IF;
