@@ -316,3 +316,59 @@ SELECT * FROM Vyber;
 SELECT * FROM Prevod;
 SELECT * FROM V_bance;
 SELECT * FROM Mimo_banku;
+
+
+
+--cast 3
+--alespon dva dotazy vyuzivajici spojeni dvou tabulek,  +
+--jeden vyuzivajici spojeni tri tabulek,                +
+--dva dotazy s klauzuli GROUP BY a agregacni funkci,    +   kinda (to same 2* skoro)
+--jeden dotaz obsahujici predikat EXISTS                + (+-+-)
+--jeden dotaz s predikatem IN s vnorenym selectem (nikoliv IN s mnozinou konstantnich dat), +(meh)
+
+
+--tj. celkem minimalne 7 dotazu. U kazdeho z dotazu musi byt (v komentari SQL kodu) popsano srozumitelne,
+--jaka data hleda dany dotaz (jaka je jeho funkce v aplikaci).
+
+
+--ktery klienti maji alespon 100 litru na ucte (ani jeden lol)
+SELECT  r_cislo, jmeno, prijmeni, stav
+FROM Klient NATURAL JOIN Ucet
+WHERE stav > 100000;
+
+
+--kteri klienti jsou i disponentem
+SELECT DISTINCT jmeno, prijmeni, r_cislo
+FROM Disponent NATURAL JOIN Klient
+WHERE jmeno LIKE '%';
+
+--klienti ktery jsou disponentem alespon jednoho uctu, ktery neni prazdny
+SELECT  jmeno, prijmeni, r_cislo, stav
+FROM Disponent NATURAL JOIN Ucet NATURAL JOIN Klient --asi ok, ale jak mame data tak vsechny takove ucty jsou prazdne
+WHERE stav > 100;
+
+--ktery klienti odeslali nejvic penez pryc z banky
+SELECT jmeno, prijmeni, r_cislo, SUM(castka)
+FROM Klient NATURAL JOIN Mimo_banku
+GROUP BY jmeno, prijmeni, r_cislo
+ORDER BY SUM(castka) DESC;
+
+--Kolik maji celkove penez jednotlivy klienti na svych uctech
+SELECT jmeno, prijmeni, r_cislo, SUM(stav) celkem
+FROM Klient NATURAL LEFT JOIN Ucet
+GROUP BY jmeno, prijmeni, r_cislo
+ORDER BY celkem DESC;
+
+--kteri klienti uz nekdy prevedly penize?
+SELECT jmeno, prijmeni, r_cislo
+FROM Klient NATURAL JOIN Prevod
+WHERE EXISTS 
+(SELECT jmeno, prijmeni, r_cislo
+FROM Klient NATURAL JOIN Prevod
+WHERE castka > 0);                    --meh 
+
+
+--kteri klienti maji stejne jmeno jako prijmeni nejakeho jineho klienta (ani jeden)
+SELECT jmeno, prijmeni, r_cislo
+FROM Klient
+WHERE jmeno IN (SELECT prijmeni FROM Klient WHERE jmeno LIKE '%');
