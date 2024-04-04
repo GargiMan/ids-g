@@ -317,16 +317,14 @@ SELECT * FROM Prevod;
 SELECT * FROM V_bance;
 SELECT * FROM Mimo_banku;
 
+------------------------------------------------------------
+------------------------SELECT-DATA-------------------------
+------------------------------------------------------------
 
-
---3. Cast (7 prikazu SELECT)
-
-
---Kteri klienti maji alespon 100 000 na ucte.
+--Kteri klienti maji alespon 20 000 na ucte.
 SELECT  r_cislo, jmeno, prijmeni, stav
 FROM Klient NATURAL JOIN Ucet
-WHERE stav > 100000;
-
+WHERE stav > 20000;
 
 --Kteri klienti jsou i disponentem.
 SELECT DISTINCT jmeno, prijmeni, r_cislo
@@ -357,7 +355,6 @@ WHERE EXISTS
 (SELECT jmeno, prijmeni, r_cislo
 FROM Klient NATURAL JOIN Prevod
 WHERE castka > 0);
-
 
 --Kteri klienti maji stejne jmeno jako prijmeni nejakeho jineho klienta.
 SELECT jmeno, prijmeni, r_cislo
