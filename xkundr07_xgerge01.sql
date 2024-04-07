@@ -332,9 +332,9 @@ FROM Disponent NATURAL JOIN Klient
 WHERE jmeno LIKE '%';
 
 --Klienti kteri jsou disponentem alespon jednoho uctu, ktery neni prazdny.
-SELECT  jmeno, prijmeni, r_cislo, stav
-FROM Disponent NATURAL JOIN Ucet NATURAL JOIN Klient
-WHERE stav > 100;
+SELECT DISTINCT Klient.jmeno, Klient.prijmeni, Klient.r_cislo
+FROM Disponent JOIN Ucet ON Disponent.c_uctu = Ucet.c_uctu JOIN Klient ON Disponent.r_cislo = Klient.r_cislo
+WHERE stav > 0;
 
 --Kteri klienti odeslali nejvic penez pryc z banky.
 SELECT jmeno, prijmeni, r_cislo, SUM(castka)
