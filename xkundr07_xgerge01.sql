@@ -269,7 +269,7 @@ END;
 
 INSERT INTO Klient VALUES('440726/0672', 'Jan', 'Novak', 'Cejl 8, Brno', '+420 123 456 789', 'jannovak@gmail.com');
 INSERT INTO Klient VALUES('530610/4532', 'Petr', 'Vesely', 'Podzimni 28, Brno', '+420 918 521 341', 'petrvesely12@azet.sk');
-INSERT INTO Klient VALUES('601001/2218', 'Ivan', 'Zeman ', 'Cejl 8, Brno', '+420 123 451 142', 'zeman99@seznam.cz');
+INSERT INTO Klient VALUES('601001/2218', 'Ivan', 'Pavel ', 'Cejl 8, Brno', '+420 123 451 142', 'pavel99@seznam.cz');
 INSERT INTO Klient VALUES('510230/0482', 'Pavel', 'Tomek', 'Tomkova 34, Brno', '+420 523 816 199', 'ptomek1@gmail.com');
 INSERT INTO Klient VALUES('580807/9638', 'Josef', 'Madr', 'Svatoplukova 15, Brno', '+420 881 989 234', 'josef.madr@gmail.com');
 INSERT INTO Klient VALUES('625622/6249', 'Jana', 'Mala', 'Brnenska 56, Vyskov', '+420 345 215 968', 'malajana@gmail.com');
@@ -331,10 +331,10 @@ SELECT DISTINCT jmeno, prijmeni, r_cislo
 FROM Disponent NATURAL JOIN Klient
 WHERE jmeno LIKE '%';
 
---Klienti kteri jsou disponentem alespon jednoho uctu, ktery neni prazdny.
-SELECT DISTINCT Klient.jmeno, Klient.prijmeni, Klient.r_cislo
-FROM Disponent JOIN Ucet ON Disponent.c_uctu = Ucet.c_uctu JOIN Klient ON Disponent.r_cislo = Klient.r_cislo
-WHERE stav > 0;
+--Klienti kteri jsou disponentem alespon jednoho uctu, na kterem je pres 30 000.
+SELECT  DISTINCT jmeno, prijmeni, K.r_cislo
+FROM Klient K, Disponent D, Ucet U
+WHERE K.r_cislo=D.r_cislo AND D.C_UCTU = U.C_UCTU AND U.stav>30000;
 
 --Kteri klienti odeslali nejvic penez pryc z banky.
 SELECT jmeno, prijmeni, r_cislo, SUM(castka)
@@ -346,17 +346,21 @@ ORDER BY SUM(castka) DESC;
 SELECT jmeno, prijmeni, r_cislo, SUM(stav) celkem
 FROM Klient NATURAL LEFT JOIN Ucet
 GROUP BY jmeno, prijmeni, r_cislo
+HAVING SUM(stav) > 0
 ORDER BY celkem DESC;
 
 --Kteri klienti uz nekdy prevedli penize.
 SELECT jmeno, prijmeni, r_cislo
 FROM Klient NATURAL JOIN Prevod
-WHERE EXISTS 
-(SELECT jmeno, prijmeni, r_cislo
-FROM Klient NATURAL JOIN Prevod
-WHERE castka > 0);
+WHERE EXISTS
+          (SELECT jmeno, prijmeni, r_cislo
+           FROM Klient NATURAL JOIN Prevod
+           WHERE castka > 0);
 
---Kteri klienti maji stejne jmeno jako prijmeni nejakeho jineho klienta.
+--Kteri klienti jsou disponentem vice nez jednoho uctu.
 SELECT jmeno, prijmeni, r_cislo
 FROM Klient
-WHERE jmeno IN (SELECT prijmeni FROM Klient WHERE jmeno LIKE '%');
+WHERE r_cislo IN (SELECT D.R_CISLO FROM Klient K, DISPONENT D
+                WHERE K.R_CISLO = D.R_CISLO
+                group by K.R_CISLO
+                having COUNT(*)>1);
