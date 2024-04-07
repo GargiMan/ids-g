@@ -344,9 +344,8 @@ ORDER BY SUM(castka) DESC;
 
 --Kolik maji celkove penez jednotlivi klienti na svych uctech.
 SELECT jmeno, prijmeni, r_cislo, SUM(stav) celkem
-FROM Klient NATURAL LEFT JOIN Ucet
+FROM Klient NATURAL JOIN Ucet
 GROUP BY jmeno, prijmeni, r_cislo
-HAVING SUM(stav) > 0
 ORDER BY celkem DESC;
 
 --Kteri klienti uz nekdy prevedli penize.
