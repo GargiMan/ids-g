@@ -4,14 +4,15 @@
 ---------------------------TABLES---------------------------
 ------------------------------------------------------------
 
--- Drop all tables
+-- Drop all tables and materialized view
 BEGIN
+    EXECUTE IMMEDIATE 'DROP MATERIALIZED VIEW mv';
     FOR i IN (SELECT table_name FROM user_tables) LOOP
         EXECUTE IMMEDIATE 'DROP TABLE ' || i.table_name || ' CASCADE CONSTRAINTS PURGE';
     END LOOP;
 EXCEPTION
     WHEN OTHERS THEN
-        IF SQLCODE != -942 THEN -- -942 = table does not exist
+        IF SQLCODE != -942 AND SQLCODE != -12003 THEN -- -942 = table does not exist, -12003 = materialized view does not exist
             RAISE;
         END IF;
 END;
@@ -23,7 +24,8 @@ CREATE TABLE Klient (
     prijmeni VARCHAR(255),
     adresa VARCHAR(255),
     telefon VARCHAR(255),
-    email VARCHAR(255)
+    email VARCHAR(255),
+    pohlavi VARCHAR(255)
 );
 
 --Entity
@@ -204,6 +206,17 @@ END;
 --------------------------TRIGGERS--------------------------
 ------------------------------------------------------------
 
+CREATE OR REPLACE TRIGGER trig_insert_klient
+BEFORE INSERT ON Klient
+FOR EACH ROW
+BEGIN
+    IF substr(:NEW.r_cislo, 3, 1) < 5 THEN
+        :NEW.pohlavi := 'muz';
+    ELSE
+        :NEW.pohlavi := 'zena';
+    END IF;
+END;
+
 CREATE OR REPLACE TRIGGER trig_insert_ucet
 BEFORE INSERT ON Ucet
 FOR EACH ROW
@@ -267,12 +280,12 @@ END;
 ------------------------INSERT-DATA-------------------------
 ------------------------------------------------------------
 
-INSERT INTO Klient VALUES('440726/0672', 'Jan', 'Novak', 'Cejl 8, Brno', '+420 123 456 789', 'jannovak@gmail.com');
-INSERT INTO Klient VALUES('530610/4532', 'Petr', 'Vesely', 'Podzimni 28, Brno', '+420 918 521 341', 'petrvesely12@azet.sk');
-INSERT INTO Klient VALUES('601001/2218', 'Ivan', 'Pavel ', 'Cejl 8, Brno', '+420 123 451 142', 'pavel99@seznam.cz');
-INSERT INTO Klient VALUES('510230/0482', 'Pavel', 'Tomek', 'Tomkova 34, Brno', '+420 523 816 199', 'ptomek1@gmail.com');
-INSERT INTO Klient VALUES('580807/9638', 'Josef', 'Madr', 'Svatoplukova 15, Brno', '+420 881 989 234', 'josef.madr@gmail.com');
-INSERT INTO Klient VALUES('625622/6249', 'Jana', 'Mala', 'Brnenska 56, Vyskov', '+420 345 215 968', 'malajana@gmail.com');
+INSERT INTO Klient(r_cislo, jmeno, prijmeni, adresa, telefon, email) VALUES('440726/0672', 'Jan', 'Novak', 'Cejl 8, Brno', '+420 123 456 789', 'jannovak@gmail.com');
+INSERT INTO Klient(r_cislo, jmeno, prijmeni, adresa, telefon, email) VALUES('530610/4532', 'Petr', 'Vesely', 'Podzimni 28, Brno', '+420 918 521 341', 'petrvesely12@azet.sk');
+INSERT INTO Klient(r_cislo, jmeno, prijmeni, adresa, telefon, email) VALUES('601001/2218', 'Ivan', 'Pavel ', 'Cejl 8, Brno', '+420 123 451 142', 'pavel99@seznam.cz');
+INSERT INTO Klient(r_cislo, jmeno, prijmeni, adresa, telefon, email) VALUES('510230/0482', 'Pavel', 'Tomek', 'Tomkova 34, Brno', '+420 523 816 199', 'ptomek1@gmail.com');
+INSERT INTO Klient(r_cislo, jmeno, prijmeni, adresa, telefon, email) VALUES('580807/9638', 'Josef', 'Madr', 'Svatoplukova 15, Brno', '+420 881 989 234', 'josef.madr@gmail.com');
+INSERT INTO Klient(r_cislo, jmeno, prijmeni, adresa, telefon, email) VALUES('625622/6249', 'Jana', 'Mala', 'Brnenska 56, Vyskov', '+420 345 215 968', 'malajana@gmail.com');
 
 INSERT INTO Ucet VALUES(4320271, '440726/0672', 52000, 0800, 000000);
 INSERT INTO Ucet VALUES(2348537, '530610/4532', 10000, 0800, 000000);
@@ -363,3 +376,40 @@ WHERE r_cislo IN (SELECT D.R_CISLO FROM Klient K, DISPONENT D
                 WHERE K.R_CISLO = D.R_CISLO
                 group by K.R_CISLO
                 having COUNT(*)>1);
+
+------------------------------------------------------------
+------------------------PERMISSIONS-------------------------
+------------------------------------------------------------
+
+CREATE MATERIALIZED VIEW mv AS SELECT r_cislo AS vlastnik, c_uctu, predcisli, c_banky, stav FROM Ucet
+
+GRANT ALL ON mv TO XGERGE01;
+
+-- When xgerge01 executes 'SELECT * FROM XKUNDR07.MV_1'
+-- He can't see the data in the table, but he can see the data in the materialized view that can be updated by the owner of the materialized view.
+
+-- Give all permissions to XGERGE01
+-- GRANT ALL ON Klient TO XGERGE01;
+-- GRANT ALL ON Ucet TO XGERGE01;
+-- GRANT ALL ON Disponent TO XGERGE01;
+-- GRANT ALL ON Vklad TO XGERGE01;
+-- GRANT ALL ON Vyber TO XGERGE01;
+-- GRANT ALL ON V_bance TO XGERGE01;
+-- GRANT ALL ON Mimo_banku TO XGERGE01;
+-- GRANT SELECT ON Prevod TO XGERGE01;
+-- GRANT SELECT ON Operace TO XGERGE01;
+
+-- Revoke all permissions from XGERGE01
+-- REVOKE ALL ON Klient FROM XGERGE01;
+-- REVOKE ALL ON Ucet FROM XGERGE01;
+-- REVOKE ALL ON Disponent FROM XGERGE01;
+-- REVOKE ALL ON Vklad FROM XGERGE01;
+-- REVOKE ALL ON Vyber FROM XGERGE01;
+-- REVOKE ALL ON V_bance FROM XGERGE01;
+-- REVOKE ALL ON Mimo_banku FROM XGERGE01;
+-- REVOKE SELECT ON Prevod FROM XGERGE01;
+-- REVOKE SELECT ON Operace FROM XGERGE01;
+
+------------------------------------------------------------
+--------------------------INDEXING--------------------------
+------------------------------------------------------------
