@@ -331,7 +331,7 @@ SELECT * FROM V_bance;
 SELECT * FROM Mimo_banku;
 
 ------------------------------------------------------------
-------------------------SELECT-DATA-------------------------
+---------SELECT-DATA---INDEX---EXPLAIN-TABLE----------------
 ------------------------------------------------------------
 
 --Kteri klienti maji alespon 20 000 na ucte.
@@ -355,11 +355,18 @@ FROM Klient NATURAL JOIN Mimo_banku
 GROUP BY jmeno, prijmeni, r_cislo
 ORDER BY SUM(castka) DESC;
 
+
+
+------------------------Explain plan--------------------------
 --Kolik maji celkove penez jednotlivi klienti na svych uctech.
-SELECT jmeno, prijmeni, r_cislo, SUM(stav) celkem
-FROM Klient NATURAL JOIN Ucet
-GROUP BY jmeno, prijmeni, r_cislo
-ORDER BY celkem DESC;
+EXPLAIN PLAN FOR
+    SELECT jmeno, prijmeni, r_cislo, SUM(stav) celkem
+    FROM Klient NATURAL JOIN Ucet
+    GROUP BY jmeno, prijmeni, r_cislo
+    ORDER BY celkem DESC;
+
+--Ukaz posledne vytvoreny exlain plan
+SELECT PLAN_TABLE_OUTPUT FROM TABLE(DBMS_XPLAN.DISPLAY());
 
 --Kteri klienti uz nekdy prevedli penize.
 SELECT jmeno, prijmeni, r_cislo
@@ -376,6 +383,30 @@ WHERE r_cislo IN (SELECT D.R_CISLO FROM Klient K, DISPONENT D
                 WHERE K.R_CISLO = D.R_CISLO
                 group by K.R_CISLO
                 having COUNT(*)>1);
+
+
+
+--------------------------- Index --------------------------
+--agregační funkce = SUM(stav), GROUP BY je tam taky, spojeni Klienta a uctu.
+--Index na klienta, pri hledani transakci v bance se obvykle potrebuje zjistit kdo a pro koho je transakce.
+--Pouzitim tohoto indexu se snizilo maximalni vitizeni procesoru o 6% z 40% na 34%, pocet operaci o 2,
+--pocet max dat k operaci ze 4 operaci, kazde vyuzivajicich 1188 bytu na 3 operace, kazde vyuzivajicich 147 bytu
+--cas se v sekundach nezmenil (pod 1s)
+--Dale urychlit pouzitim indexu na tabulku Ucet.
+--explain table v souborech s indexem.txt, no index.txt
+CREATE INDEX jmena
+ON Klient (jmeno, prijmeni, r_cislo);
+
+EXPLAIN PLAN FOR
+    SELECT jmeno, prijmeni, r_cislo, SUM(stav) celkem
+    FROM Klient NATURAL JOIN Ucet
+    GROUP BY jmeno, prijmeni, r_cislo
+    ORDER BY celkem DESC;
+
+SELECT PLAN_TABLE_OUTPUT FROM TABLE(DBMS_XPLAN.DISPLAY());
+
+
+DROP INDEX jmena;
 
 ------------------------------------------------------------
 ------------------------PERMISSIONS-------------------------
