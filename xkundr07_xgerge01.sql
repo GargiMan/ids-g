@@ -4,17 +4,18 @@
 ---------------------------TABLES---------------------------
 ------------------------------------------------------------
 
--- Drop all tables and materialized view
+-- Drop all tables
 BEGIN
-    EXECUTE IMMEDIATE 'DROP MATERIALIZED VIEW mv';
     FOR i IN (SELECT table_name FROM user_tables) LOOP
-        EXECUTE IMMEDIATE 'DROP TABLE ' || i.table_name || ' CASCADE CONSTRAINTS PURGE';
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP TABLE ' || i.table_name || ' CASCADE CONSTRAINTS PURGE';
+        EXCEPTION
+            WHEN OTHERS THEN
+                IF SQLCODE != -942 AND SQLCODE != -12083 THEN -- -942 = table does not exist, -12083 = drop materialized view
+                    RAISE;
+                END IF;
+        END;
     END LOOP;
-EXCEPTION
-    WHEN OTHERS THEN
-        IF SQLCODE != -942 AND SQLCODE != -12003 THEN -- -942 = table does not exist, -12003 = materialized view does not exist
-            RAISE;
-        END IF;
 END;
 
 --Entity
@@ -48,7 +49,7 @@ CREATE TABLE Operace (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    datum_cas TIMESTAMP DEFAULT TO_TIMESTAMP(SYSDATE,'DD-MM-RRRR HH24:MI:SS.FF'),
     castka DECIMAL(10,2) NOT NULL,
     provedl VARCHAR(255)
 );
@@ -58,7 +59,7 @@ CREATE TABLE Vklad (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    datum_cas TIMESTAMP DEFAULT TO_TIMESTAMP(SYSDATE,'DD-MM-RRRR HH24:MI:SS.FF'),
     castka DECIMAL(10,2) NOT NULL,
     provedl VARCHAR(255) DEFAULT 'System'
 );
@@ -68,7 +69,7 @@ CREATE TABLE Vyber (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    datum_cas TIMESTAMP DEFAULT TO_TIMESTAMP(SYSDATE,'DD-MM-RRRR HH24:MI:SS.FF'),
     castka DECIMAL(10,2) NOT NULL,
     provedl VARCHAR(255) DEFAULT 'System'
 );
@@ -78,7 +79,7 @@ CREATE TABLE Prevod (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    datum_cas TIMESTAMP DEFAULT TO_TIMESTAMP(SYSDATE,'DD-MM-RRRR HH24:MI:SS.FF'),
     castka DECIMAL(10,2) NOT NULL,
     provedl VARCHAR(255) DEFAULT 'System',
     proti_predcisli NUMBER(6) DEFAULT 0,
@@ -90,7 +91,7 @@ CREATE TABLE V_bance (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    datum_cas TIMESTAMP DEFAULT TO_TIMESTAMP(SYSDATE,'DD-MM-RRRR HH24:MI:SS.FF'),
     castka DECIMAL(10,2) NOT NULL,
     provedl VARCHAR(255) DEFAULT 'System',
     proti_predcisli NUMBER(6) DEFAULT 0,
@@ -102,7 +103,7 @@ CREATE TABLE Mimo_banku (
     c_operace INTEGER,
     c_uctu NUMBER(10) NOT NULL,
     r_cislo CHAR(11) NOT NULL,
-    datum_cas TIMESTAMP DEFAULT SYSTIMESTAMP,
+    datum_cas TIMESTAMP DEFAULT TO_TIMESTAMP(SYSDATE,'DD-MM-RRRR HH24:MI:SS.FF'),
     castka DECIMAL(10,2) NOT NULL,
     provedl VARCHAR(255) DEFAULT 'System',
     proti_predcisli NUMBER(6) DEFAULT 0,
@@ -157,6 +158,77 @@ ALTER TABLE Mimo_banku ADD CONSTRAINT FK_mimo_banku_r_cislo FOREIGN KEY (r_cislo
 ------------------PROCEDURES-AND-FUNCTIONS------------------
 ------------------------------------------------------------
 
+CREATE OR REPLACE PROCEDURE show_statement_for_random_account AS
+    TYPE account_numbers_t IS TABLE OF Ucet.c_uctu%TYPE;
+    account_numbers account_numbers_t;
+    random_index NUMBER;
+    random_account_number Ucet.c_uctu%TYPE;
+    account_stav Ucet.stav%TYPE;
+    transaction_record Operace%ROWTYPE;
+    transaction_id_vyber Vklad.c_operace%TYPE;
+    transaction_id_vklad Vyber.c_operace%TYPE;
+    transaction_id_v_bance V_bance.c_operace%TYPE;
+    transaction_id_mimo_banku Mimo_banku.c_operace%TYPE;
+    CURSOR account_cursor IS SELECT c_uctu FROM Ucet;
+    CURSOR account_cursor_stav IS SELECT stav FROM Ucet WHERE c_uctu = random_account_number;
+    CURSOR transaction_cursor IS SELECT * FROM Operace WHERE c_uctu = random_account_number;
+    CURSOR transaction_cursor_vyber IS SELECT c_operace FROM Vyber WHERE c_uctu = random_account_number AND c_operace = transaction_record.c_operace;
+    CURSOR transaction_cursor_vklad IS SELECT c_operace FROM Vklad WHERE c_uctu = random_account_number AND c_operace = transaction_record.c_operace;
+    CURSOR transaction_cursor_v_bance IS SELECT c_operace FROM V_bance WHERE c_uctu = random_account_number AND c_operace = transaction_record.c_operace;
+    CURSOR transaction_cursor_mimo_banku IS SELECT c_operace FROM Mimo_banku WHERE c_uctu = random_account_number AND c_operace = transaction_record.c_operace;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('---------------------------------');
+
+    OPEN account_cursor;
+    FETCH account_cursor BULK COLLECT INTO account_numbers;
+    CLOSE account_cursor;
+
+    random_index := DBMS_RANDOM.VALUE(1, account_numbers.COUNT);
+    random_account_number := account_numbers(TRUNC(random_index));
+
+    OPEN account_cursor_stav;
+    FETCH account_cursor_stav INTO account_stav;
+    CLOSE account_cursor_stav;
+
+    DBMS_OUTPUT.PUT_LINE('Transactions for account: ' || random_account_number);
+    DBMS_OUTPUT.PUT_LINE('Current balance: ' || account_stav || ' CZK');
+    DBMS_OUTPUT.PUT_LINE('---------------------------------');
+
+    OPEN transaction_cursor;
+    OPEN transaction_cursor_vyber;
+    OPEN transaction_cursor_vklad;
+    OPEN transaction_cursor_v_bance;
+    OPEN transaction_cursor_mimo_banku;
+
+    LOOP
+        FETCH transaction_cursor INTO transaction_record;
+        EXIT WHEN transaction_cursor%NOTFOUND;
+        FETCH transaction_cursor_vyber INTO transaction_id_vyber;
+        FETCH transaction_cursor_vklad INTO transaction_id_vklad;
+        FETCH transaction_cursor_v_bance INTO transaction_id_v_bance;
+        FETCH transaction_cursor_mimo_banku INTO transaction_id_mimo_banku;
+        CASE
+            WHEN transaction_record.c_operace = transaction_id_vklad THEN
+                DBMS_OUTPUT.PUT_LINE(transaction_record.datum_cas || ':  Deposit ' || transaction_record.castka);
+            WHEN transaction_record.c_operace = transaction_id_vyber THEN
+                DBMS_OUTPUT.PUT_LINE(transaction_record.datum_cas || ':  Withdrawal ' || transaction_record.castka);
+            WHEN transaction_record.c_operace = transaction_id_v_bance THEN
+                DBMS_OUTPUT.PUT_LINE(transaction_record.datum_cas || ':  Transfer ' || transaction_record.castka);
+            WHEN transaction_record.c_operace = transaction_id_mimo_banku THEN
+                DBMS_OUTPUT.PUT_LINE(transaction_record.datum_cas || ':  Transfer ' || transaction_record.castka);
+        END CASE;
+    END LOOP;
+    CLOSE transaction_cursor;
+    CLOSE transaction_cursor_vyber;
+    CLOSE transaction_cursor_vklad;
+    CLOSE transaction_cursor_v_bance;
+    CLOSE transaction_cursor_mimo_banku;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+
 CREATE OR REPLACE PROCEDURE generate_account_number(c_uctu_out OUT NUMBER) AS
     v_count NUMBER;
 BEGIN
@@ -191,7 +263,7 @@ BEGIN
     SELECT COUNT(*) INTO v_count_1 FROM Ucet WHERE Ucet.r_cislo = r_cislo_in AND Ucet.c_uctu = c_uctu_in;
     SELECT COUNT(*) INTO v_count_2 FROM Disponent WHERE Disponent.r_cislo = r_cislo_in AND Disponent.c_uctu = c_uctu_in;
     IF v_count_1 = 0 AND v_count_2 = 0 THEN
-        RAISE_APPLICATION_ERROR(-20000, 'Klient does not have access to account.');
+        RAISE_APPLICATION_ERROR(-20000, 'Client does not have access to account.');
     END IF;
 END;
 
@@ -241,6 +313,9 @@ BEGIN
 
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
+
+    -- Update account balance
+    UPDATE Ucet SET stav = stav + :NEW.castka WHERE c_uctu = :NEW.c_uctu;
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_vyber
@@ -251,6 +326,9 @@ BEGIN
 
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
+
+    -- Update account balance
+    UPDATE Ucet SET stav = stav - :NEW.castka WHERE c_uctu = :NEW.c_uctu;
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_mimo_banku
@@ -262,6 +340,10 @@ BEGIN
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
     INSERT INTO Prevod VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl, :NEW.proti_predcisli, :NEW.proti_c_uctu);
+
+    -- Update accounts balance
+    UPDATE Ucet SET stav = stav - :NEW.castka WHERE c_uctu = :NEW.c_uctu;
+    UPDATE Ucet SET stav = stav + :NEW.castka WHERE c_uctu = :NEW.proti_c_uctu;
 END;
 
 CREATE OR REPLACE TRIGGER trig_insert_v_bance
@@ -274,6 +356,10 @@ BEGIN
     -- Copy values to super tables
     INSERT INTO Operace VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl);
     INSERT INTO Prevod VALUES (:NEW.c_operace, :NEW.c_uctu, :NEW.r_cislo, :NEW.datum_cas, :NEW.castka, :NEW.provedl, :NEW.proti_predcisli, :NEW.proti_c_uctu);
+
+    -- Update accounts balance
+    UPDATE Ucet SET stav = stav - :NEW.castka WHERE c_uctu = :NEW.c_uctu;
+    UPDATE Ucet SET stav = stav + :NEW.castka WHERE c_uctu = :NEW.proti_c_uctu;
 END;
 
 ------------------------------------------------------------
@@ -317,7 +403,37 @@ VALUES(4320271, '440726/0672', TO_TIMESTAMP('17-03-2017 12:30:53.123000','DD-MM-
 INSERT INTO Mimo_banku (c_uctu, r_cislo, datum_cas, castka, provedl, proti_predcisli, proti_c_uctu, proti_c_banky)
 VALUES(2075751, '510230/0482', TO_TIMESTAMP('30-08-2021 16:36:34.123000','DD-MM-RRRR HH24:MI:SS.FF'), 1000, 'Petra Silná', 000000, 2348537, 0800);
 
+-- OTHER INSERTS CHECKING FUNCTIONALITY
+/*
+-- Not existing bank account
+INSERT INTO Vklad (c_uctu, r_cislo, datum_cas, castka, provedl)
+VALUES(4320270, '440726/0672', TO_TIMESTAMP('10-10-2016 14:10:10.123000','DD-MM-RRRR HH24:MI:SS.FF'), 3000, 'Daniel Starý');
+
+-- Index of operation would be replaced
+INSERT INTO Vyber
+VALUES(9999, 4320271, '440726/0672', TO_TIMESTAMP('10-10-2016 14:10:12.123000','DD-MM-RRRR HH24:MI:SS.FF'), 3000, 'Daniel Starý');
+
+-- Accounts are not in the same bank
+INSERT INTO V_bance (c_uctu, r_cislo, datum_cas, castka, provedl, proti_predcisli, proti_c_uctu)
+VALUES(2348537, '601001/2218', TO_TIMESTAMP('28-11-2020 15:55:41.123000','DD-MM-RRRR HH24:MI:SS.FF'), 6000, 'Daniel Starý', 000000, 2075751);
+
+-- Client does not have access to account
+INSERT INTO Vklad (c_uctu, r_cislo, datum_cas, castka, provedl)
+VALUES(4320271, '601001/2218', TO_TIMESTAMP('10-10-2016 14:10:10.123000','DD-MM-RRRR HH24:MI:SS.FF'), 3000, 'Daniel Starý');
+
+-- Account number was not specified
+INSERT INTO Ucet
+VALUES(NULL, '601001/2218', 10000, 0800, 000000);
+
+-- Client gender was not specified
+INSERT INTO Klient(r_cislo)
+VALUES('896226/0672');
+*/
 COMMIT;
+
+------------------------------------------------------------
+---------SELECT-DATA---INDEX---EXPLAIN-TABLE----------------
+------------------------------------------------------------
 
 -- SHOW TABLE DATA
 SELECT * FROM Klient;
@@ -329,10 +445,6 @@ SELECT * FROM Vyber;
 SELECT * FROM Prevod;
 SELECT * FROM V_bance;
 SELECT * FROM Mimo_banku;
-
-------------------------------------------------------------
----------SELECT-DATA---INDEX---EXPLAIN-TABLE----------------
-------------------------------------------------------------
 
 --Kteri klienti maji alespon 20 000 na ucte.
 SELECT  r_cislo, jmeno, prijmeni, stav
@@ -355,6 +467,10 @@ FROM Klient NATURAL JOIN Mimo_banku
 GROUP BY jmeno, prijmeni, r_cislo
 ORDER BY SUM(castka) DESC;
 
+--Show all transactions for random account
+BEGIN
+    show_statement_for_random_account;
+END;
 
 
 ------------------------Explain plan--------------------------
@@ -393,7 +509,17 @@ WHERE r_cislo IN (SELECT D.R_CISLO FROM Klient K, DISPONENT D
 --pocet max dat k operaci ze 4 operaci, kazde vyuzivajicich 1188 bytu na 3 operace, kazde vyuzivajicich 147 bytu
 --cas se v sekundach nezmenil (pod 1s)
 --Dale urychlit pouzitim indexu na tabulku Ucet.
---explain table v souborech s indexem.txt, no index.txt
+
+-- Drop index
+BEGIN
+    EXECUTE IMMEDIATE 'DROP INDEX jmena';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1418 THEN -- -1418 = index does not exist
+            RAISE;
+        END IF;
+END;
+
 CREATE INDEX jmena
 ON Klient (jmeno, prijmeni, r_cislo);
 
@@ -405,12 +531,59 @@ EXPLAIN PLAN FOR
 
 SELECT PLAN_TABLE_OUTPUT FROM TABLE(DBMS_XPLAN.DISPLAY());
 
+/* WITHOUT INDEX
+-------------------------------------------------------------------------------------------
+| Id  | Operation                     | Name      | Rows  | Bytes | Cost (%CPU)| Time     |
+-------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT              |           |     4 |  1188 |     5  (40)| 00:00:01 |
+|   1 |  SORT ORDER BY                |           |     4 |  1188 |     5  (40)| 00:00:01 |
+|   2 |   NESTED LOOPS                |           |     4 |  1188 |     4  (25)| 00:00:01 |
+|   3 |    NESTED LOOPS               |           |     4 |  1188 |     4  (25)| 00:00:01 |
+|   4 |     VIEW                      | VW_GBC_5  |     4 |   104 |     4  (25)| 00:00:01 |
+|   5 |      HASH GROUP BY            |           |     4 |   104 |     4  (25)| 00:00:01 |
+|   6 |       TABLE ACCESS FULL       | UCET      |     4 |   104 |     3   (0)| 00:00:01 |
+|*  7 |     INDEX UNIQUE SCAN         | PK_KLIENT |     1 |       |     0   (0)| 00:00:01 |
+|   8 |    TABLE ACCESS BY INDEX ROWID| KLIENT    |     1 |   271 |     0   (0)| 00:00:01 |
+-------------------------------------------------------------------------------------------
 
-DROP INDEX jmena;
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+"   7 - access(""KLIENT"".""R_CISLO""=""ITEM_1"")"
+*/
+
+/* WITH INDEX
+----------------------------------------------------------------------------------
+| Id  | Operation             | Name     | Rows  | Bytes | Cost (%CPU)| Time     |
+----------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT      |          |     3 |   147 |     6  (34)| 00:00:01 |
+|   1 |  SORT ORDER BY        |          |     3 |   147 |     6  (34)| 00:00:01 |
+|*  2 |   HASH JOIN           |          |     3 |   147 |     5  (20)| 00:00:01 |
+|   3 |    VIEW               | VW_GBC_5 |     3 |    75 |     4  (25)| 00:00:01 |
+|   4 |     HASH GROUP BY     |          |     3 |    51 |     4  (25)| 00:00:01 |
+|   5 |      TABLE ACCESS FULL| UCET     |     4 |    68 |     3   (0)| 00:00:01 |
+|   6 |    INDEX FULL SCAN    | JMENA    |     6 |   144 |     1   (0)| 00:00:01 |
+----------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+"   2 - access(""KLIENT"".""R_CISLO""=""ITEM_1"")"
+*/
 
 ------------------------------------------------------------
 ------------------------PERMISSIONS-------------------------
 ------------------------------------------------------------
+
+-- Drop materialized view
+BEGIN
+    EXECUTE IMMEDIATE 'DROP MATERIALIZED VIEW mv';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -12003 THEN -- -12003 = materialized view does not exist
+            RAISE;
+        END IF;
+END;
 
 CREATE MATERIALIZED VIEW mv AS SELECT r_cislo AS vlastnik, c_uctu, predcisli, c_banky, stav FROM Ucet
 
@@ -440,7 +613,3 @@ GRANT ALL ON mv TO XGERGE01;
 -- REVOKE ALL ON Mimo_banku FROM XGERGE01;
 -- REVOKE SELECT ON Prevod FROM XGERGE01;
 -- REVOKE SELECT ON Operace FROM XGERGE01;
-
-------------------------------------------------------------
---------------------------INDEXING--------------------------
-------------------------------------------------------------
