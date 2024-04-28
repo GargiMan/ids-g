@@ -473,6 +473,13 @@ BEGIN
 END;
 
 
+--Categorize clients by their balance
+SELECT jmeno, prijmeni, CASE
+    WHEN stav < 10000 THEN 'Low balance'
+    WHEN stav < 50000 THEN 'Medium balance'
+    ELSE 'High balance'
+END AS balance_category FROM Ucet NATURAL JOIN Klient;
+
 ------------------------Explain plan--------------------------
 --Kolik maji celkove penez jednotlivi klienti na svych uctech.
 EXPLAIN PLAN FOR
