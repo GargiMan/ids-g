@@ -593,7 +593,7 @@ EXCEPTION
         END IF;
 END;
 
-CREATE MATERIALIZED VIEW mv AS SELECT r_cislo AS vlastnik, c_uctu, predcisli, c_banky, stav FROM Ucet
+CREATE MATERIALIZED VIEW mv REFRESH COMPLETE ON COMMIT AS SELECT r_cislo AS vlastnik, c_uctu, predcisli, c_banky, stav FROM Ucet;
 
 GRANT ALL ON mv TO XGERGE01;
 
